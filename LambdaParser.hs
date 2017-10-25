@@ -4,6 +4,8 @@
 -- Professor Roberto Ierusalimschy
 -- Parser de λ-expressões em estilo PEG.
 
+-- TODO bugs conhecidos: múltiplos comentários seguidos não são aceitos
+
 import Data.Char
 import LambdaCalculus
 import Control.Monad    (liftM)
@@ -31,10 +33,10 @@ instance Monad Parser where
 
 -- Tipo para a AST
 data AST = Identifier Lambda
-        | Parentheses AST
         | Abstraction (AST, AST)
         | Application [AST]
         | Varlist [AST]
+        | Parentheses AST
         | Primary AST
         | Simple AST
         | Root AST
@@ -220,7 +222,6 @@ runParser s =
 -- O inteiro passado é a quantidade de indentações para a impressão das camadas da AST.
 show' :: AST -> Int -> String
 show' (Root node) n = showTabs n ++ "[ Root ]\n" ++ showTabs n ++ "{\n" ++ show' node (n + 1) ++ showTabs n ++ "}\n"
-show' (Parentheses e) n = showTabs n ++ "[ Parentheses ]\n" ++ showTabs n ++ "{\n" ++ show' e (n + 1) ++ showTabs n ++ "}\n"
 show' (Abstraction (v, e)) n = showTabs n ++ "[ Abstraction ]\n" ++ showTabs n ++ "{\n" ++ show' v (n + 1) ++ show' e (n + 1) ++ showTabs n ++ "}\n"
 show' (Identifier v) n = showTabs n ++ "[ Identifier ] { " ++ show v ++ " }\n"
 show' (Varlist vs) n = showTabs n ++ "[ VarList ]\n" ++ showTabs n ++ "{\n" ++ showVarList vs (n + 1) ++ showTabs n ++ "}\n"
@@ -231,6 +232,7 @@ show' (Application es) n = foldl' concatish "" es (n + length es)
                 foldl' op z (x:xs) m = foldl' op (op z x (m - 1)) xs (m - 1)
                 concatish "" x m = show' x m
                 concatish y x m = showTabs m ++ "[ Application ]\n" ++ showTabs m ++ "{\n" ++ y ++ show' x (m + 1) ++ showTabs m ++ "}\n"
+show' (Parentheses node) n = show' node n -- Parentheses é um nó intermediário da AST
 show' (Primary node) n = show' node n -- Primary é um nó intermediário da AST
 show' (Simple node) n = show' node n -- Simple é um nó intermediário da AST
 show' (Error s) _ = s ++ "\n"
@@ -242,7 +244,9 @@ showTabs n = "\t" ++ showTabs (n - 1)
 main :: IO ()
 main = do 
         print (runParser "")
+        putStrLn "\nTeste de variavel.\n"
         print (runParser "x")
+        putStrLn "\nTestes com comentarios.\n"
         print (runParser "-- ola sou um cometario\nx   \n\t")
         print (runParser "-- Comentario \n          x")
         print (runParser "\n\t     x--ois ")
@@ -250,12 +254,17 @@ main = do
         print (runParser "x     --comment\n--comentario\ny") -- Dá erro!!!!
         print (runParser "x     --comment\n z--comentario\ny") -- Dá erro!!!!
         print (runParser "--olaaaaa\nx ")
-        print (runParser "--olaaaa\n") -- Dá erro no parser, mas deveria não aceitar.
+        putStrLn "Nao deve aceitar."
+        print (runParser "--olaaaa\n")
+        putStrLn "\nTestes com balanceamento de parenteses.\n"
         print (runParser "    ( (  (   x   )     ) )      ")
-        print (runParser "((x)") -- Dá erro no parser, mas deveria não aceitar.
+        putStrLn "Nao deve aceitar."
+        print (runParser "((x)")
+        putStrLn "\nTestes de abstracoes.\n"
         print (runParser "\\x->x")
         print (runParser "(\\x->\\y-> (x))")
         print (runParser "\\x->x x")
+        putStrLn "\nTestes de aplicacoes.\n"
         print (runParser "x y z")
         print (runParser "(x y) z")
         print (runParser "x (y z)")
@@ -263,6 +272,7 @@ main = do
         print (runParser "(x y) (z w)")
         print (runParser "x (y (z w))")
         print (runParser "(x y) (z w x1)")
+        putStrLn "\nTestes misturando abstracoes e aplicacoes.\n"
         print (runParser "x \\z-> y") -- Ver se isso aqui é permitido
         print (runParser "x (\\z-> z y)")
         print (runParser "\\z x y-> x z y")
