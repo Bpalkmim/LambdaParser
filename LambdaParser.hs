@@ -36,9 +36,6 @@ data AST = Identifier Lambda
         | Abstraction (AST, AST)
         | Application [AST]
         | Varlist [AST]
-        | Parentheses AST
-        | Primary AST
-        | Simple AST
         | Root AST
         | Error String -- Para mensagens de erro
 
@@ -169,7 +166,7 @@ parenthesized = do
         symbol "("
         e <- expression
         symbol ")"
-        return (Parentheses e)
+        return e
 
 varlist :: Parser AST
 varlist = do
@@ -193,7 +190,7 @@ simple :: Parser AST
 simple = do
         e <-    parenthesized
                 `por1` identifier
-        return (Simple e)
+        return e
 
 expression :: Parser AST
 expression = do
@@ -201,7 +198,7 @@ expression = do
                 `por1` application
                 `por1` simple
         spaces
-        return (Primary e)
+        return e
 
 root :: Parser AST
 root = do
@@ -232,9 +229,6 @@ show' (Application es) n = foldl' concatish "" es (n + length es)
                 foldl' op z (x:xs) m = foldl' op (op z x (m - 1)) xs (m - 1)
                 concatish "" x m = show' x m
                 concatish y x m = showTabs m ++ "[ Application ]\n" ++ showTabs m ++ "{\n" ++ y ++ show' x (m + 1) ++ showTabs m ++ "}\n"
-show' (Parentheses node) n = show' node n -- Parentheses é um nó intermediário da AST
-show' (Primary node) n = show' node n -- Primary é um nó intermediário da AST
-show' (Simple node) n = show' node n -- Simple é um nó intermediário da AST
 show' (Error s) _ = s ++ "\n"
 
 showTabs :: Int -> String
